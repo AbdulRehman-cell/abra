@@ -1,0 +1,121 @@
+name: Build, Test, and Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: static-site
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  lint-and-validate:
+    name: Lint & Validate HTML/CSS/JS
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate HTML files exist
+        run: |
+          shopt -s nullglob
+          files=(*.html)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No HTML files found!"
+            exit 1
+          fi
+          echo "Found ${#files[@]} HTML files."
+
+      - name: Lint HTML with htmlhint
+        uses: docker://node:20.17.0-alpine3.20
+        with:
+          args: >
+            sh -c "npx --yes htmlhint@1.1.4 '*.html' || true"
+
+      - name: Check for broken relative links (basic)
+        run: |
+          for f in *.html; do
+            grep -oE 'href="[^"]+\.html"' "$f" | sed 's/href="//;s/"//' | while read -r link; do
+              if [[ "$link" != http* ]] && [ ! -f "$link" ]; then
+                echo "WARNING: $f references missing file $link"
+              fi
+            done
+          done
+
+  build-and-test:
+    name: Build Docker Image & Smoke Test
+    runs-on: ubuntu-22.04
+    needs: lint-and-validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run container for smoke test
+        run: |
+          docker run -d --name smoke-test -p 8080:8080 ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          sleep 5
+
+      - name: Health check
+        run: |
+          for i in {1..10}; do
+            if curl -fsS http://localhost:8080/healthz; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Waiting for service... ($i)"
+            sleep 3
+          done
+          echo "Health check failed"
+          docker logs smoke-test
+          exit 1
+
+      - name: Verify homepage responds 200
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
+          if [ "$status" -ne 200 ]; then
+            echo "Homepage did not return 200 (got $status)"
+            docker logs smoke-test
+            exit 1
+          fi
+          echo "Homepage OK ($status)"
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f smoke-test || true
+
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Trigger Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL secret is not set. Skipping deploy trigger."
+            exit 1
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "Render deploy triggered successfully."
