@@ -1,16 +1,18 @@
-# Render Blueprint — static-site friendly, but using Docker since a
-# Dockerfile is provided (gives full control over headers/caching/healthcheck).
+# Render Blueprint — Infrastructure as Code
+# Docs: https://render.com/docs/blueprint-spec
+
 services:
   - type: web
-    name: forgeai-static-site
+    name: static-site
     runtime: docker
-    plan: starter
-    region: oregon
+    plan: starter          # change to "standard" / "pro" for more resources
+    region: oregon          # change to your preferred region
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
+    autoDeploy: true
+    branch: main
     envVars:
       - key: TZ
         value: UTC
-    autoDeploy: true
-    branch: main
+    # No persistent disks or databases needed for a static site.

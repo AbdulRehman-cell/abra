@@ -1,22 +1,26 @@
-version: "3.9"
+# Local development / smoke-testing compose file.
+# There is no database, cache, or backend — this is a static site.
+# This compose file exists purely to build & run the nginx image locally
+# in a way that mirrors production (Render) behavior.
 
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile
-    image: forgeai-static-site:1.0.0
-    container_name: forgeai-static-site
+    image: static-site:local
+    container_name: static-site
     ports:
       - "8080:8080"
-    restart: unless-stopped
+    environment:
+      # No secrets or runtime env vars are required for a static site.
+      # Kept here as a placeholder in case future env-driven config
+      # (e.g., analytics IDs injected at build time) is added.
+      - TZ=UTC
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
-    environment:
-      - TZ=UTC
-    # No database or cache services required — this is a static site with
-    # no server-side logic and no persistent state.
+      start_period: 5s
+    restart: unless-stopped

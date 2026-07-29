@@ -3,26 +3,27 @@
 .gitignore
 .github
 
-# Docs (not needed inside image)
+# Docs — not needed inside the image
 DEPLOY.md
 README.md
 *.md
 
-# Local env files
+# Local env / secrets
 .env
 .env.*
 !.env.example
-
-# OS/editor cruft
-.DS_Store
-Thumbs.db
-.vscode
-.idea
 
 # Docker files themselves
 docker-compose.yml
 Dockerfile
 .dockerignore
 
-# CI configs
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+.idea
+.vscode
+
+# CI config not needed in image
 render.yaml
