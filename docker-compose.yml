@@ -1,23 +1,22 @@
-# Local development / staging convenience only.
-# Render deploys via Dockerfile directly and does NOT use this file.
+version: "3.9"
+
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
-    image: static-site:1.0.0
-    container_name: static-site
+    image: forgeai-static-site:1.0.0
+    container_name: forgeai-static-site
     ports:
       - "8080:8080"
-    environment:
-      # No runtime env vars required for a static site.
-      # Placeholder kept for parity with .env.example
-      - SITE_ENV=${SITE_ENV:-production}
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
-    restart: unless-stopped
+    environment:
+      - TZ=UTC
+    # No database or cache services required — this is a static site with
+    # no server-side logic and no persistent state.

@@ -1,14 +1,16 @@
+# Render Blueprint — static-site friendly, but using Docker since a
+# Dockerfile is provided (gives full control over headers/caching/healthcheck).
 services:
   - type: web
-    name: static-site
+    name: forgeai-static-site
     runtime: docker
     plan: starter
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
-    autoDeploy: true
     envVars:
-      - key: SITE_ENV
-        value: production
-    numInstances: 1
+      - key: TZ
+        value: UTC
+    autoDeploy: true
+    branch: main

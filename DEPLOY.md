@@ -1,96 +1,87 @@
-# Deploy Guide — Static Site on Render
+# Deploy Guide — ForgeAI Static Site on Render
 
-This project is a **plain static HTML/CSS/JS site** with no build step. It is served in production by **nginx inside a Docker container**, deployed on **Render** using `render.yaml`.
+This is a **plain static HTML/CSS/JS site** served through a minimal, pinned
+`nginx` Docker image. No build tools, no Node, no npm — just files served
+over HTTP with security headers, gzip, caching, and a health check.
 
-You can go live in under 5 minutes.
-
----
+You can be live in under 5 minutes.
 
 ## Prerequisites
 
 - A [Render](https://render.com) account (free to sign up)
-- This repository pushed to GitHub, GitLab, or Bitbucket
-- (Optional, for local testing) [Docker](https://www.docker.com/) installed
+- This repo pushed to GitHub/GitLab
+- Docker installed locally (only needed for local testing, optional)
 
 ---
 
-## Option A: Deploy to Render in 3 commands (via CLI)
+## Option A: Deploy to Render via Blueprint (fastest)
 
-```bash
-# 1. Install the Render CLI (if not already installed)
-brew install render
+1. Push this repo to GitHub (if not already):
+   ```bash
+   git add .
+   git commit -m "Add production deployment config"
+   git push origin main
+   ```
 
-# 2. Authenticate with Render
-render login
+2. Go to the Render Dashboard → **New** → **Blueprint**, and connect this
+   repository. Render will auto-detect `render.yaml` and configure the
+   service for you.
 
-# 3. Deploy using the render.yaml blueprint in this repo
-render blueprint launch
-```
+3. Click **Apply** — Render will build the Docker image and deploy it.
+   Your site will be live at `https://<your-service-name>.onrender.com`.
 
-Render will detect `render.yaml`, build the Docker image, and deploy the `static-site` web service automatically. Your site will be live at the URL Render assigns (e.g. `https://static-site.onrender.com`).
-
----
-
-## Option B: Deploy via Render Dashboard (no CLI, beginner-friendly)
-
-1. Push this repo to GitHub.
-2. Go to https://dashboard.render.com → **New** → **Blueprint**.
-3. Connect your repository. Render auto-detects `render.yaml`.
-4. Click **Apply** — Render builds the Dockerfile and deploys.
-5. Once the health check at `/healthz` passes, your site is live.
-
-That's it — no environment variables are required to get started.
+That's it — 3 steps, no manual service configuration needed.
 
 ---
 
-## Local Testing Before Deploy
+## Option B: Manual Render Web Service (Docker runtime)
 
-Test the exact production image locally:
+1. Render Dashboard → **New** → **Web Service** → connect your repo.
+2. Runtime: **Docker**. Dockerfile path: `./Dockerfile`.
+3. Health Check Path: `/healthz`.
+4. Click **Create Web Service**.
 
-```bash
-docker build -t static-site:1.0.0 .
-docker run -p 8080:8080 static-site:1.0.0
-```
+---
 
-Visit http://localhost:8080 — you should see `index.html`.
+## Enable Auto-Deploy from GitHub Actions (optional but recommended)
 
-Or with Docker Compose:
+1. In Render, go to your service → **Settings** → **Deploy Hook** → copy the URL.
+2. In GitHub, go to your repo → **Settings** → **Secrets and variables** →
+   **Actions** → **New repository secret**:
+   - Name: `RENDER_DEPLOY_HOOK_URL`
+   - Value: (paste the deploy hook URL)
+3. Every push to `main` will now: validate HTML → build & smoke-test the
+   Docker image → trigger a Render deploy automatically.
+
+---
+
+## Test Locally Before Deploying
 
 ```bash
 docker compose up --build
+curl http://localhost:8080/healthz
 ```
 
----
-
-## Enabling Automated CI/CD (GitHub Actions)
-
-The included `.github/workflows/deploy.yml` will:
-1. Lint HTML
-2. Build the Docker image
-3. Run a smoke/health test
-4. Trigger a Render deploy hook on push to `main`
-
-To enable step 4:
-
-1. In Render Dashboard → your service → **Settings** → **Deploy Hook**, copy the URL.
-2. In GitHub repo → **Settings** → **Secrets and variables** → **Actions**, add:
-   - Name: `RENDER_DEPLOY_HOOK_URL`
-   - Value: *(paste the hook URL)*
-3. Push to `main` — deployment now happens automatically after tests pass.
+Visit `http://localhost:8080` in your browser. Stop with `docker compose down`.
 
 ---
 
-## Environment Variables
+## The 3 Commands to Deploy Right Now
 
-None are required. See `.env.example` for optional/informational variables (`SITE_ENV`, `PORT`).
+```bash
+git push origin main
+# Then in Render dashboard: New -> Blueprint -> select this repo -> Apply
+curl https://<your-service-name>.onrender.com/healthz
+```
 
 ---
 
 ## Troubleshooting
 
-| Issue | Fix |
-|---|---|
-| Health check fails on Render | Confirm `healthCheckPath: /healthz` matches `default.conf` and port `8080` |
-| 404 on a page | Ensure the `.html` file exists at repo root and is referenced correctly |
-| Styles/JS not loading | Check `assets/` cache headers aren't stale; hard-refresh browser |
-| Local Docker build fails | Ensure Docker Desktop is running and you're on the repo root directory |
+- **Build fails on Render**: confirm `Dockerfile` and `nginx.conf` are at the
+  repo root and committed.
+- **Health check failing**: ensure port `8080` is exposed and `/healthz`
+  returns `200 ok` (test locally with the curl command above).
+- **404 on routes like `/about`**: the nginx config uses
+  `try_files $uri $uri.html $uri/ =404;` so `about.html` is served at `/about`.
+  Ensure filenames match exactly (case-sensitive).

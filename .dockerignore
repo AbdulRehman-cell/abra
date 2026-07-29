@@ -1,0 +1,28 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Docs (not needed inside image)
+DEPLOY.md
+README.md
+*.md
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+
+# Docker files themselves
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# CI configs
+render.yaml
